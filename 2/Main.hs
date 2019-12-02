@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
-import           Control.Arrow                            ( (***) )
+import           Control.Arrow                            ( (***)
+                                                          , (>>>)
+                                                          )
 import           Control.Monad                            ( (>=>) )
 import           Control.Monad.Primitive                  ( PrimMonad
                                                           , PrimState
@@ -30,11 +32,21 @@ eval pc v = VUM.read v pc >>= \case
   99 -> pure ()
   i  -> error $ "Nope: " <> show i
 
+part1 :: VU.Vector Int -> VU.Vector Int
+part1 =
+  VU.modify (\v -> VUM.write v 1 12 >> VUM.write v 2 2) >>> VU.modify (eval 0)
+
+part2 :: VU.Vector Int -> [(Int, Int)] -> (Int, Int)
+part2 _ [] = error "NO FOUND!"
+part2 p ((i, j) : xs) =
+  let p' = VU.modify (eval 0)
+                     (VU.modify (\v -> VUM.write v 1 i >> VUM.write v 2 j) p)
+  in  if (p' VU.! 0) == 19690720 then (i, j) else part2 p xs
+
 main = do
   program <-
-    VU.modify (eval 0)
-    .   VU.modify (\v -> VUM.write v 1 12 >> VUM.write v 2 2)
-    .   VU.fromList
+    VU.fromList
     .   unfoldr (sequence . (read *** fmap snd . uncons) . break (== ','))
     <$> readFile "input.txt"
-  print program
+  print (part1 program)
+  print (part2 program ((,) <$> [0 .. 99] <*> [0 .. 99]))
