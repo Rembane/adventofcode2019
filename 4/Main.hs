@@ -3,7 +3,7 @@ import           Data.List                                ( foldl'
                                                           , group
                                                           )
 doubleDigit :: String -> Bool
-doubleDigit = any ((> 1) . length) . group
+doubleDigit = any ((== 2) . length) . group
 
 neverDecrease :: String -> Bool
 neverDecrease = snd . foldl'
