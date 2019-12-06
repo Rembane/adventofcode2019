@@ -1,9 +1,8 @@
-{-# LANGUAGE LambdaCase #-}
 import           Control.Arrow
 import           Control.Monad.Combinators
 import           Data.Function
-import           Data.Ix
 import           Data.List
+import qualified Data.Map.Strict               as M
 import qualified Data.Set                      as S
 import           Data.Void
 import           Text.Megaparsec                          ( Parsec
@@ -43,33 +42,58 @@ tt ((x1, y1), (x2, y2)) = ((x1, x2), (y1, y2))
 trace :: (Pos, Pos) -> [Pos]
 trace =
   map Pos
+    . tail
     . uncurry zip
-    . both (inf . range . (uncurry min &&& uncurry max))
+    . both (\(i1, i2) -> inf $ enumFromThenTo i1 (next i1 i2) i2)
     . tt
     . both unPos
  where
   inf [v] = repeat v
   inf vs  = vs
+  next i1 i2 = case compare i1 i2 of
+    LT -> i1 + 1
+    EQ -> i1
+    GT -> i1 - 1
 
+allIntersections :: [S.Set Pos] -> S.Set Pos
+allIntersections = S.delete (Pos (0, 0)) . foldr1 S.intersection
+
+part1 :: S.Set Pos -> Int
+part1 = S.findMin . S.map (uncurry (+) . both abs . unPos)
+
+part2 :: S.Set Pos -> [[Pos]] -> Int
+part2 is = minimum . foldr1 (M.unionWith (+)) . map
+  ( M.fromListWith const
+  . counter 1
+  . concat
+  . uncurry (zipWith (curry trace))
+  . (id &&& tail)
+  )
+ where
+  counter _ [] = []
+  counter i (p : ps) | S.member p is = (p, i) : counter (i + 1) ps
+                     | otherwise     = counter (i + 1) ps
 
 main :: IO ()
 main =
   readFile "input.txt"
     >>= (parse (some ((vParser `sepBy1` char ',') <* optional newline)) "Glrgh"
-        >>> \case
-              Left e -> print e
-              Right fs ->
-                print
-                  $ S.findMin
-                  $ S.map (uncurry (+) . both abs . unPos)
-                  $ S.delete (Pos (0, 0))
-                  $ foldr1 S.intersection
-                  $ map
-                      ( S.fromList
-                      . concat
-                      . uncurry (zipWith (curry trace))
-                      . (id &&& tail)
-                      . scanl' (&) (Pos (0, 0))
-                      )
-                      fs
+        >>> either
+              print
+              (   map (scanl' (&) (Pos (0, 0)))
+              >>> (\ps ->
+                    let
+                      is =
+                        ( allIntersections
+                          . map
+                              ( S.fromList
+                              . concat
+                              . uncurry (zipWith (curry trace))
+                              . (id &&& tail)
+                              )
+                          )
+                          ps
+                    in  print (part1 is) >> print (part2 is ps)
+                  )
+              )
         )
