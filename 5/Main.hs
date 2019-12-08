@@ -36,6 +36,20 @@ binHelper f ps v pc =
   in  trace ("Write @ " <> show (v VU.! (pc + 3)) <> " <- " <> show r)
             (VU.modify (\v' -> VUM.write v' (v VU.! (pc + 3)) r) v)
 
+-- | Just to make it more fun we introduce tagteam recursion
+jumpHelper
+  :: (Bool -> Bool) -> Parameters -> VU.Vector Int -> Int -> IO (VU.Vector Int)
+jumpHelper f ps v pc = if f (readParam (snd $ unParam ps) v (pc + 1) /= 0)
+  then eval (readParam (fst $ unParam ps) v (pc + 2)) v
+  else eval (pc + 3) v
+
+cmpHelper
+  :: (Int -> Int -> Bool) -> Parameters -> VU.Vector Int -> Int -> VU.Vector Int
+cmpHelper cmp ps v pc =
+  let r = cmp (readParam (snd $ unParam ps) v (pc + 1))
+              (readParam (fst $ unParam ps) v (pc + 2))
+  in  VU.modify (\v' -> VUM.write v' (v VU.! (pc + 3)) (if r then 1 else 0)) v
+
 eval :: Int -> VU.Vector Int -> IO (VU.Vector Int)
 eval pc v =
   let
@@ -60,6 +74,10 @@ eval pc v =
              putStrLn $ "\x1b[0;31mOutput:\x1b[0m " <> show
                (readParam (snd $ unParam ps) v (pc + 1))
              eval (pc + 2) v
+           5  -> jumpHelper id ps v pc
+           6  -> jumpHelper not ps v pc
+           7  -> cmpHelper (<) ps v pc & eval (pc + 4)
+           8  -> cmpHelper (==) ps v pc & eval (pc + 4)
            99 -> pure v
            i' -> error $ "Nope: " <> show i'
 
