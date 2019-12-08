@@ -6,6 +6,8 @@ import           Data.Maybe
 import qualified Data.Vector.Unboxed           as VU
 import qualified Data.Vector.Unboxed.Mutable   as VUM
 
+import           Debug.Trace
+
 newtype Parameters = Parameters {unParam :: (Bool, Bool)}
 
 parseParameters :: Int -> Parameters
@@ -20,14 +22,19 @@ doubleRead :: VU.Vector Int -> Int -> Int
 doubleRead v = (v VU.!) . (v VU.!)
 
 readParam :: Bool -> VU.Vector Int -> Int -> Int
-readParam isImmediate v i = if isImmediate then v VU.! i else doubleRead v i
+readParam isImmediate v i = if isImmediate
+  then trace ("read @ " <> show i <> " -> " <> show (v VU.! i)) (v VU.! i)
+  else
+    let r = doubleRead v i
+    in  trace ("doubleRead @ " <> show i <> " -> " <> show r) r
 
 binHelper
   :: (Int -> Int -> Int) -> Parameters -> VU.Vector Int -> Int -> VU.Vector Int
 binHelper f ps v pc =
   let r = f (readParam (snd $ unParam ps) v (pc + 1))
             (readParam (fst $ unParam ps) v (pc + 2))
-  in  VU.modify (\v' -> VUM.write v' (v VU.! (pc + 3)) r) v
+  in  trace ("Write @ " <> show (v VU.! (pc + 3)) <> " <- " <> show r)
+            (VU.modify (\v' -> VUM.write v' (v VU.! (pc + 3)) r) v)
 
 eval :: Int -> VU.Vector Int -> IO (VU.Vector Int)
 eval pc v =
@@ -50,7 +57,8 @@ eval pc v =
              VU.modify (\v' -> VUM.write v' (v VU.! (pc + 1)) x) v
                & eval (pc + 2)
            4 -> do
-             putStrLn $ "Output: " <> show (v VU.! (pc + 1))
+             putStrLn $ "\x1b[0;31mOutput:\x1b[0m " <> show
+               (readParam (snd $ unParam ps) v (pc + 1))
              eval (pc + 2) v
            99 -> pure v
            i' -> error $ "Nope: " <> show i'
