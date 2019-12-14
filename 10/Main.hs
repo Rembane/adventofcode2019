@@ -2,21 +2,22 @@
 
 import           Control.Arrow                            ( (***)
                                                           , (&&&)
+                                                          , second
                                                           )
 import           Data.Function                            ( on )
-import           Data.List                                ( break
-                                                          , group
+import           Data.List                                ( group
                                                           , groupBy
                                                           , maximumBy
                                                           , sort
                                                           , sortOn
+                                                          , uncons
                                                           )
+import           Data.Maybe                               ( fromJust )
 import           Data.Ord                                 ( comparing )
 import qualified Data.Sequence                 as Sq
 import           Data.Sequence                            ( Seq(..)
                                                           , (|>)
                                                           )
-import           Data.Tuple                               ( swap )
 
 both :: (a -> b) -> (a, a) -> (b, b)
 both f = f *** f
@@ -25,7 +26,15 @@ tt :: ((a, b), (a, b)) -> ((a, a), (b, b))
 tt ((x1, y1), (x2, y2)) = ((x1, x2), (y1, y2))
 
 calcAngle :: (Double, Double) -> (Double, Double) -> Double
-calcAngle p = uncurry (flip atan2) . both (uncurry (-)) . tt . (, p)
+calcAngle p =
+  norm
+    . subtract (pi / 2)
+    . uncurry (flip atan2)
+    . second negate
+    . both (uncurry (-))
+    . tt
+    . (, p)
+  where norm v = if v < 0.0 then v + 2 * pi else v
 
 seenAsteroids
   :: (Double, Double) -> [(Double, Double)] -> ((Double, Double), Int)
@@ -42,9 +51,9 @@ consume n (x :<| xs) = case horiz n x of
   (n' , x'  ) -> consume n' (xs |> x')
  where
   horiz :: Int -> [(Double, Double)] -> (Int, [(Double, Double)])
-  horiz n   []       = (n, [])
-  horiz 200 (x : xs) = (200, [x])
-  horiz n   (x : xs) = (succ n, xs)
+  horiz m   []       = (m, [])
+  horiz 200 (y : _ ) = (200, [y])
+  horiz m   (_ : ys) = (succ m, ys)
 
 main :: IO ()
 main = do
@@ -62,22 +71,27 @@ main = do
   -- Part 1
   let (station, seen) =
         maximumBy (comparing snd) $ map (`seenAsteroids` asteroids) asteroids
+  print station
   print seen
 
   -- Part 2
-  -- This list goes counter clockwise, we want to go clockwise, so we reverse the list.
-  -- We also want to go from (0,1) and not (1,0) which atan2 does, so we start from pi/2
-  -- instead of 0.
   print
     . (\(x, y) -> x * 100 + y)
     . consume 1
     . Sq.fromList
-    . map (sortOn (\(x, y) -> sqrt $ x ** 2.0 + y ** 2.0) . map fst)
-    . uncurry (++)
-    . swap
-    . break ((<= (pi / 2)) . snd . head)
-    . reverse
+    . uncurry (:)
+    . second reverse
+    . fromJust
+    . uncons
+    . map
+        ( sortOn
+            (\(x, y) ->
+              sqrt $ (x - fst station) ** 2.0 + (y - snd station) ** 2.0
+            )
+        . map fst
+        )
     . groupBy (on (==) snd)
     . sortOn snd
     . map (id &&& calcAngle station)
+    . filter (/= station)
     $ asteroids
