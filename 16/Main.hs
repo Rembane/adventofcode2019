@@ -1,27 +1,34 @@
-import           Control.Arrow                            ( (&&&) )
 import           Data.Char                                ( digitToInt
                                                           , intToDigit
                                                           , isDigit
                                                           )
+import qualified Data.Vector.Unboxed           as VU
 
 -- | Run one phase of the fft
-fft :: [Int] -> [Int]
-fft =
-  zipWith
-      (\i -> (`mod` 10) . abs . sum . zipWith
-        (*)
-        (tail $ cycle $ concatMap (replicate i) [0, 1, 0, -1])
-      )
-      [1 ..]
-    . uncurry replicate
-    . (length &&& id)
+fft :: VU.Vector Int -> VU.Vector Int
+fft xs = VU.map
+  (\i -> (`mod` 10) . abs . VU.sum $ VU.zipWith
+    (*)
+    (VU.fromList $ take (VU.length xs) $ tail $ cycle $ concatMap
+      (replicate i)
+      [0, 1, 0, -1]
+    )
+    xs
+  )
+  (VU.enumFromN 1 (VU.length xs))
 
+run :: Int -> VU.Vector Int -> VU.Vector Int
+run 0 v = v
+run i v = run (i - 1) (fft v)
+
+main :: IO ()
 main =
   putStrLn
-    .   map intToDigit
-    .   take 8
-    .   (!! 100)
-    .   iterate fft
+    .   VU.toList
+    .   VU.map intToDigit
+    .   VU.take 8
+    .   run 100
+    .   VU.fromList
     .   map digitToInt
     .   filter isDigit
     =<< readFile "input.txt"
