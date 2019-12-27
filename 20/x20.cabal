@@ -1,0 +1,13 @@
+cabal-version:       >=1.10
+name:                x20
+version:             0.1.0.0
+license:             BSD3
+author:              Andreas Ekeroot
+maintainer:          andeke@gmail.com
+build-type:          Simple
+
+executable x20
+  main-is:             Main.hs
+  other-extensions:    LambdaCase, TupleSections
+  build-depends:       base >=4.11 && <4.12, containers, vector
+  default-language:    Haskell2010
